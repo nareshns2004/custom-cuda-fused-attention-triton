@@ -1,359 +1,76 @@
-# custom-cuda-kernel-triton-kernel
+# Kernel lab: CUDA and Triton
 
-> Building high-performance GPU kernels from first principles by progressively implementing and optimizing deep learning operators in CUDA and Triton.
+> **Status: kernel lab.** This repo holds a small learning set of GPU kernels (vector add,
+> layernorm, tiled matmul) in both CUDA and Triton, with tests against PyTorch.
+> **It does not contain a fused attention kernel yet**, despite the repo name. The Triton fused
+> attention kernel (prefill forward, split-K decode, paged KV) is being built inside the
+> disaggregated inference engine, where its KV block layout is the same unit the engine moves
+> between GPUs over RDMA. This repo will link there once it exists.
 
----
+## What exists
 
-# Project Goal
+| Kernel    | Triton                                   | CUDA                                         | Op (`ops/`)          |
+|-----------|------------------------------------------|----------------------------------------------|----------------------|
+| add       | `kernels/triton/add_kernel.py`           | `kernels/cuda/add_kernel.cu`                 | `ops/add_op.py`      |
+| layernorm | `kernels/triton/layernorm_kernel.py`     | `kernels/cuda/layernorm_kernel.cu`           | `ops/layernorm_op.py`|
+| matmul    | `kernels/triton/matmul_kernel.py`        | `kernels/cuda/matmul_kernel.cu` (16×16 tiles)| `ops/matmul_op.py`   |
 
-This repository is a deep dive into GPU programming, CUDA internals, and Triton kernel development.
+Each op takes `backend="triton" | "cuda" | "torch"`, so A/B comparisons are one argument.
+The CUDA kernels are deliberately simple teaching baselines (no register blocking, no tensor
+cores); the Triton ones are the main path.
 
-Rather than treating CUDA as a black box, this project focuses on understanding how modern AI frameworks achieve high performance by implementing kernels from scratch and optimizing them step by step.
+Known bugs found by the audit, and their fix status, are tracked in
+[`docs/audit.md`](docs/audit.md). Design decisions are in
+[`docs/design-decisions.md`](docs/design-decisions.md).
 
-The objective is to bridge the gap between
-
-* AI Frameworks (PyTorch)
-* CUDA Programming
-* GPU Architecture
-* Compiler Optimizations
-* High Performance Computing (HPC)
-
-This repository is intended as both a learning resource and a production-quality engineering portfolio.
-
----
-
-# Objectives
-
-* Learn CUDA programming from first principles
-* Understand GPU execution model
-* Implement custom CUDA kernels
-* Implement Triton kernels
-* Compare CUDA vs Triton implementations
-* Benchmark against PyTorch native operators
-* Understand memory hierarchy and optimization
-* Learn GPU profiling tools
-* Study kernel fusion techniques
-* Explore tensor core utilization
-* Develop intuition for GPU performance bottlenecks
-
----
-
-# Project Scope
-
-The project is divided into progressive stages.
-
-## Phase 1 — CUDA Fundamentals
-
-Topics include
-
-* CUDA Programming Model
-* Threads
-* Blocks
-* Grids
-* Warps
-* Occupancy
-* Memory hierarchy
-* Synchronization
-* Streams
-* Events
-* Unified Memory
-
-Deliverables
-
-* Vector Addition
-* Matrix Addition
-* Matrix Multiplication
-* Reduction
-* Prefix Sum
-* Histogram
-* Softmax
-* LayerNorm
-* GELU
-* ReLU
-* BatchNorm
-
----
-
-## Phase 2 — CUDA Optimization
-
-Focus on understanding why kernels become faster.
-
-Topics
-
-* Shared Memory
-* Register Usage
-* Memory Coalescing
-* Bank Conflicts
-* Loop Unrolling
-* Warp Shuffle
-* Persistent Kernels
-* Occupancy Optimization
-* Asynchronous Copy
-* CUDA Graphs
-
-Deliverables
-
-Optimized versions of
-
-* GEMM
-* Softmax
-* Reduction
-* LayerNorm
-* Attention primitives
-
-Each implementation will include
-
-* Baseline version
-* Optimized version
-* Performance comparison
-* Profiling report
-
----
-
-## Phase 3 — Triton Programming
-
-Implement commonly used deep learning operators using Triton.
-
-Topics
-
-* Triton Language
-* Block Programming
-* Program IDs
-* Tile Mapping
-* Pointer Arithmetic
-* Auto-tuning
-
-Deliverables
-
-* Vector Add
-* Matrix Multiply
-* Softmax
-* LayerNorm
-* RMSNorm
-* GELU
-* Flash Attention (simplified)
-
----
-
-## Phase 4 — CUDA vs Triton
-
-Implement identical operators in
-
-* CUDA
-* Triton
-* PyTorch
-
-Compare
-
-* Execution time
-* Throughput
-* GPU utilization
-* Memory bandwidth
-* Occupancy
-* Lines of code
-* Maintainability
-
----
-
-## Phase 5 — PyTorch Extensions
-
-Create custom operators usable directly from PyTorch.
-
-Deliverables
-
-* C++ Extensions
-* CUDA Extensions
-* Python bindings
-* Autograd support
-* Packaging
-* Unit tests
-
----
-
-## Phase 6 — Profiling & Benchmarking
-
-Profile every kernel using industry-standard tooling.
-
-Tools
-
-* Nsight Compute
-* Nsight Systems
-* nvprof (where applicable)
-* PyTorch Profiler
-
-Metrics
-
-* Latency
-* Throughput
-* Occupancy
-* Memory bandwidth
-* FLOPS
-* Warp efficiency
-* SM utilization
-
----
-
-## Phase 7 — Advanced Kernels
-
-Advanced implementations inspired by production AI systems.
-
-Examples
-
-* Flash Attention
-* Fused MLP
-* Fused LayerNorm
-* RMSNorm
-* Rotary Embeddings
-* KV Cache operations
-* Quantization kernels
-* MoE routing primitives
-
----
-
-# Repository Structure
+## Layout
 
 ```text
-custom-cuda-kernel-triton-kernel/
-│
-├── docs/
-│   ├── gpu_architecture/
-│   ├── optimization_notes/
-│   └── profiling_reports/
-│
-├── cuda/
-│   ├── fundamentals/
-│   ├── optimization/
-│   ├── gemm/
-│   ├── reduction/
-│   └── attention/
-│
-├── triton/
-│   ├── basics/
-│   ├── matmul/
-│   ├── softmax/
-│   └── flash_attention/
-│
-├── pytorch_extensions/
-│
-├── benchmarks/
-│
-├── tests/
-│
-├── notebooks/
-│
-├── scripts/
-│
-└── README.md
+kernels/triton/   Triton kernels and launchers
+kernels/cuda/     CUDA kernels, Torch C++ extension bindings, CMakeLists.txt
+ops/              Backend dispatch (triton / cuda / torch)
+tests/            Correctness vs PyTorch; CPU via TRITON_INTERPRET=1, GPU-only tests marked `gpu`
+benchmarks/       triton.testing.do_bench scripts; `make bench` generates RESULTS.md
+docs/             Audit, design decisions
 ```
 
----
+## Usage
 
-# Technology Stack
+```bash
+pip install -e ".[dev]"
 
-* CUDA
-* Triton
-* C++
-* Python
-* PyTorch
-* CMake
-* Nsight Compute
-* Nsight Systems
-* NVIDIA CUDA Toolkit
+# Correctness on CPU (no GPU needed), via Triton's interpreter
+make test                 # = TRITON_INTERPRET=1 pytest -m "not gpu"
 
----
+# On a GPU host
+make build-cuda           # build the CUDA extension (CMake, C++20)
+make test-gpu             # all tests, including CUDA-extension tests
+make racecheck            # compute-sanitizer racecheck on the CUDA layernorm
+make bench                # writes benchmarks/RESULTS.md, stamped with versions
+```
 
-# Learning Outcomes
+```python
+import torch
+from ops.layernorm_op import layernorm
 
-After completing this repository, the following concepts should be well understood.
+x = torch.randn(8, 4096, device="cuda")
+w, b = torch.ones(4096, device="cuda"), torch.zeros(4096, device="cuda")
+y = layernorm(x, w, b, backend="triton")
+```
 
-* GPU Architecture
-* CUDA Programming
-* Warp Scheduling
-* Shared Memory
-* Tensor Cores
-* Memory Hierarchy
-* Triton Programming
-* Kernel Fusion
-* GPU Profiling
-* Performance Engineering
-* PyTorch Extension Development
+## Performance
 
----
+No performance numbers are written by hand in this repo. `make bench` generates
+`benchmarks/RESULTS.md` on a GPU, recording the GPU, driver, CUDA, Triton and PyTorch versions.
+Until that file exists, there are no measured numbers.
 
-# Success Metrics
+## Scope
 
-Each kernel should be evaluated using
+In scope: the three learning-set kernels above, correct for any size and stride, tested and
+benchmarked against PyTorch. Out of scope here: attention (lives in the inference engine), a
+backward pass, and the broader CUDA curriculum (prefix sum, histogram, CUTLASS, TensorRT
+plugins, MoE kernels).
 
-* Functional correctness
-* Unit tests
-* Numerical accuracy
-* Performance benchmarks
-* Memory usage
-* Profiling reports
-* Optimization notes
+## License
 
----
-
-# Deliverables
-
-Every implemented operator should include
-
-* Source code
-* Documentation
-* Benchmark script
-* Unit tests
-* Performance comparison
-* Profiling screenshots
-* Optimization walkthrough
-* Design notes
-
----
-
-# Target Audience
-
-This repository is intended for
-
-* AI Infrastructure Engineers
-* ML Systems Engineers
-* GPU Software Engineers
-* CUDA Developers
-* Compiler Engineers
-* HPC Engineers
-* Performance Engineers
-* Systems Programmers
-
----
-
-# Future Extensions
-
-Potential future work includes
-
-* CUTLASS exploration
-* TensorRT custom plugins
-* cuBLAS comparisons
-* cuDNN comparisons
-* Distributed GPU kernels
-* Multi-GPU communication
-* NCCL primitives
-* Custom AI operators
-* CUDA Graph optimization
-* Compiler-assisted kernel generation
-
----
-
-# References
-
-* NVIDIA CUDA Programming Guide
-* NVIDIA CUDA Best Practices Guide
-* Triton Documentation
-* PyTorch C++ Extensions
-* CUTLASS
-* FlashAttention
-* NVIDIA Nsight Documentation
-
----
-
-# License
-
-This project is released under the Apache-2.0 License.
-
+Apache-2.0.
