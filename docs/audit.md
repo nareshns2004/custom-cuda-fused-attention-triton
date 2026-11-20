@@ -12,9 +12,9 @@ C13 was found while writing the tests. Status is updated in the commit that chan
 | C5 | High | CMake targets C++17 (PyTorch needs C++20); `CUDA_ARCHITECTURES native` needs CMake ≥ 3.24, minimum declared 3.18 | Fixed (P3): C++20, CMake 3.24, links `libtorch_python`. Not yet built end to end (needs a GPU host) |
 | C6 | High | Repo name promises fused attention; there is none. README title and tree didn't match the repo | README fixed; repo rename is the owner's call |
 | C7 | Medium | Packaging empty; `pyproject.py` instead of `pyproject.toml`; error message pointed at commands that didn't work | Fixed |
-| C8 | Medium | No tests, benchmarks or profiling | Open |
-| C9 | Low | FP32 `tl.dot` uses TF32 on Ampere+ by default, so GPU results differ from `torch.matmul` | Open |
-| C10 | Low | CUDA layernorm reads each row three times; CUDA matmul has no register blocking or tensor cores; Triton matmul had no autotune | Accepted: CUDA kernels are labelled baselines |
+| C8 | Medium | No tests, benchmarks or profiling | Tests (P1) and do_bench benchmarks (P4) added; `benchmarks/RESULTS.md` not yet generated (needs a GPU); Nsight Compute write-ups pending |
+| C9 | Low | FP32 `tl.dot` uses TF32 on Ampere+ by default, so GPU results differ from `torch.matmul` | Fixed (P4): FP32 uses `input_precision="ieee"` unless `allow_tf32=True`. Checked by compiling for sm_80: IEEE path emits no TF32 MMA, TF32 path does |
+| C10 | Low | CUDA layernorm reads each row three times; CUDA matmul has no register blocking or tensor cores; Triton matmul had no autotune | CUDA kernels accepted as labelled baselines. Triton matmul now autotuned with grouped tile ordering (P4) |
 | C11 | Medium | README was a 7-phase, 40+ kernel curriculum | Fixed |
 | C12 | Low | `main` is one commit on a different root from the PR branches | Small PRs from now on |
 | C13 | Medium | Triton add ignores strides: flat offsets on non-contiguous or mixed-layout inputs give wrong results (max error 5.4 for a transposed + contiguous pair) | Fixed (P2): op makes operands contiguous (copy is the documented cost); shape/dtype checks |

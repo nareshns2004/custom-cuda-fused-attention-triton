@@ -11,6 +11,7 @@ SHAPES = [
     (100, 70, 130),  # nothing divisible by the block sizes
     (257, 129, 63),
     (256, 512, 128),
+    (600, 40, 200),  # >8 tile rows at BLOCK_M=64: grouped ordering spans two groups
 ]
 
 
@@ -42,14 +43,36 @@ def test_matmul_non_contiguous(device, transpose):
 
 @pytest.mark.gpu
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a GPU")
-@pytest.mark.xfail(strict=False, reason="C9: FP32 tl.dot defaults to TF32 on Ampere+")
 def test_matmul_fp32_is_ieee_on_gpu():
-    # Tight FP32 tolerance: TF32 (10-bit mantissa) inputs miss this by orders of magnitude.
+    # Regression for C9. Tight FP32 tolerance: TF32 (10-bit mantissa) misses it by orders of
+    # magnitude, so this fails if the kernel silently falls back to TF32.
     a = torch.randn(512, 512, device="cuda")
     b = torch.randn(512, 512, device="cuda")
-    torch.testing.assert_close(matmul(a, b), (a.double() @ b.double()).float(), atol=1e-4, rtol=1e-4)
+    torch.testing.assert_close(
+        matmul(a, b), (a.double() @ b.double()).float(), atol=1e-4, rtol=1e-4
+    )
 
 
-def test_matmul_rejects_bad_backend():
+@pytest.mark.gpu
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a GPU")
+def test_matmul_tf32_opt_in_on_gpu():
+    # TF32 is opt-in; its error vs FP64 is ~1e-3 relative per product, so compare loosely.
+    a = torch.randn(512, 512, device="cuda")
+    b = torch.randn(512, 512, device="cuda")
+    ref = (a.double() @ b.double()).float()
+    torch.testing.assert_close(matmul(a, b, allow_tf32=True), ref, atol=5e-2, rtol=1e-2)
+
+
+def test_matmul_empty_and_zero_k(device):
+    assert matmul(torch.randn(0, 5, device=device), torch.randn(5, 3, device=device)).shape == (0, 3)
+    out = matmul(torch.randn(4, 0, device=device), torch.randn(0, 3, device=device))
+    assert out.shape == (4, 3) and (out == 0).all()
+
+
+def test_matmul_rejects_bad_inputs():
     with pytest.raises(ValueError):
         matmul(torch.ones(2, 2), torch.ones(2, 2), backend="nope")
+    with pytest.raises(ValueError):
+        matmul(torch.ones(2, 3), torch.ones(2, 3))
+    with pytest.raises(ValueError):
+        matmul(torch.ones(2, 2), torch.ones(2, 2, dtype=torch.float16))
