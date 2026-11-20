@@ -21,8 +21,11 @@ def _require_cuda_extension():
 
 
 def add(a: torch.Tensor, b: torch.Tensor, backend: str = "triton") -> torch.Tensor:
+    """Elementwise a + b for same-shape, same-dtype tensors (no broadcasting)."""
     if backend not in BACKENDS:
         raise ValueError(f"Unknown backend: {backend}. Choose from {BACKENDS}")
+    if a.shape != b.shape or a.dtype != b.dtype or a.device != b.device:
+        raise ValueError("add expects tensors with the same shape, dtype and device")
 
     if backend == "torch":
         return a + b
@@ -31,6 +34,11 @@ def add(a: torch.Tensor, b: torch.Tensor, backend: str = "triton") -> torch.Tens
         _require_cuda_extension()
         return cuda_kernels.add(a, b)
 
-    out = torch.empty_like(a)
+    # The Triton kernel indexes flat memory, so it needs contiguous operands (audit C13).
+    # A non-contiguous input is copied first; that extra read+write is the honest cost of
+    # supporting it in a memory-bound kernel. Output is always contiguous.
+    a = a.contiguous()
+    b = b.contiguous()
+    out = torch.empty(a.shape, device=a.device, dtype=a.dtype)
     triton_launch_add(a, b, out)
     return out

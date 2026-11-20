@@ -26,18 +26,22 @@ def test_add_2d_contiguous(device):
     assert_close(out, a + b, ELEMENTWISE)
 
 
-@pytest.mark.xfail(strict=True, reason="C13: Triton add uses flat offsets and ignores strides")
 def test_add_mixed_layout(device):
+    # Regression for C13.
     a = torch.randn(64, 48, device=device).t()  # non-contiguous view
     b = torch.randn(48, 64, device=device)  # contiguous
     assert_close(add(a, b), a + b, ELEMENTWISE)
 
 
-@pytest.mark.xfail(strict=True, reason="C13: Triton add uses flat offsets and ignores strides")
 def test_add_strided_1d(device):
     a = torch.randn(200, device=device)[::2]
     b = torch.randn(100, device=device)
     assert_close(add(a, b), a + b, ELEMENTWISE)
+
+
+def test_add_rejects_shape_mismatch():
+    with pytest.raises(ValueError):
+        add(torch.ones(4), torch.ones(5))
 
 
 def test_add_rejects_bad_backend():
