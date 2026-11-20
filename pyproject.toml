@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kernel-lab"
+version = "0.1.0"
+description = "Small, tested GPU kernel lab: add, layernorm and matmul in CUDA and Triton"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.4",
+    "triton>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "pybind11>=2.12",
+]
+
+[tool.setuptools.packages.find]
+include = ["kernels*", "ops*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: needs a real CUDA GPU (deselect on CPU with -m 'not gpu')",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

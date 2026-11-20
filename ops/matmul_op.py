@@ -16,7 +16,7 @@ BACKENDS = ("cuda", "triton", "torch")
 def _require_cuda_extension():
     if cuda_kernels is None:
         raise ImportError(
-            "cuda_kernels extension is not built. Run `pip install -e .` or `make build`."
+            "cuda_kernels extension is not built. Build it on a GPU host with `make build-cuda`."
         )
 
 
