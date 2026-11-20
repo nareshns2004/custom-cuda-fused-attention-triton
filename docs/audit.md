@@ -7,9 +7,9 @@ C13 was found while writing the tests. Status is updated in the commit that chan
 |---|----------|---------|--------|
 | C1 | High | Triton layernorm silently wrong when hidden size > `BLOCK_SIZE` (1024): max error 3.1e35 at 4096 | Fixed (P2): block = next power of two up to 64 KiB of input, chunked loop above that |
 | C2 | Medium | Triton layernorm ignores strides (`row_start = row_idx * hidden_size`) | Fixed (P2): row and column strides passed to the kernel |
-| C3 | High | Race in CUDA layernorm `block_reduce_sum`: second call writes `shared[]` with no barrier while other warps may still read `shared[0]` from the first; also hard-codes 256 threads | Open |
-| C4 | High | `bindings.cpp` doesn't compile: `at::cuda::getCurrentCUDAStream` needs `ATen/cuda/CUDAContext.h`; no device guard | Open |
-| C5 | High | CMake targets C++17 (PyTorch needs C++20); `CUDA_ARCHITECTURES native` needs CMake ≥ 3.24, minimum declared 3.18 | Open |
+| C3 | High | Race in CUDA layernorm `block_reduce_sum`: second call writes `shared[]` with no barrier while other warps may still read `shared[0]` from the first; also hard-codes 256 threads | Fixed in code (P3): warp-shuffle reduction, trailing barrier, any block size that is a multiple of 32. nvcc-compiled; GPU tests and `make racecheck` still to run |
+| C4 | High | `bindings.cpp` doesn't compile: `at::cuda::getCurrentCUDAStream` needs `ATen/cuda/CUDAContext.h`; no device guard | Fixed (P3): includes added, `CUDAGuard` on the input device, same-device and int-overflow checks. Syntax-checked with g++ against PyTorch 2.14 headers |
+| C5 | High | CMake targets C++17 (PyTorch needs C++20); `CUDA_ARCHITECTURES native` needs CMake ≥ 3.24, minimum declared 3.18 | Fixed (P3): C++20, CMake 3.24, links `libtorch_python`. Not yet built end to end (needs a GPU host) |
 | C6 | High | Repo name promises fused attention; there is none. README title and tree didn't match the repo | README fixed; repo rename is the owner's call |
 | C7 | Medium | Packaging empty; `pyproject.py` instead of `pyproject.toml`; error message pointed at commands that didn't work | Fixed |
 | C8 | Medium | No tests, benchmarks or profiling | Open |
